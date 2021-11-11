@@ -23,15 +23,15 @@ askIPAddress() {
 	printf "${NC}\n"
 	read answer  # create variable to retains the answer
 	case "$answer" in
-        1) setIPAddress ;;
-        2) setStatic ;;
+        1) setStatic ;;
+        2) setDHCP ;;
     esac
 
 
 }
 
 
-setStatic() {
+setDHCP() {
 	printf "${GREEN}Setting DHCP\n"
 	sleep 2
 	cat <<EOF> /etc/netplan/50-cloud-init.yaml
@@ -51,7 +51,7 @@ EOF
 
 
 
-setIPAddress() {
+setStatic() {
    clear
   # printf "${GREEN}=====================================================================\n"
   # printf "${GREEN}This appliance will need two static IP addresses with internet access\n"
@@ -101,65 +101,14 @@ EOF
 
 }
 
-K8s_Install() {
 
-echo "Deploying K8s. Please Wait"
-echo ""
-/root/deployMicroK8S.sh &>/dev/null & disown
-
-
-while ps ax | grep -v grep | grep "deployMicroK8S.sh" > /dev/null
-do
-    echo -n .
-    sleep 2
-done
-
-echo ""
-echo "Deploying Kasten K10. Please Wait"
-echo ""
-
-/root/deployK10.sh >/dev/null &>/dev/null & disown
-
-while ps ax | grep -v grep | grep "deployK10.sh" > /dev/null
-do
-    echo -n .
-    sleep 2
-done
-
-echo ""
-echo "Deploying Wordpress on K8s. Please Wait"
-echo ""
-
-/root/deployWordpress.sh >/dev/null &>/dev/null & disown
-
-while ps ax | grep -v grep | grep "deployWordpress.sh" > /dev/null
-do
-    echo -n .
-    sleep 2
-done
-
-
-
-}
 
 
 askIPAddress
 
 sleep 5
-#K8s_Install
-
-wget -q --spider http://google.com
-   if [ $? -eq 0 ]; then
-    echo "You are Online. Starting Install"
-	K8s_Install
-   else
-    echo "Cannot Reach Internet, Please re-run IP Address setup"
-	read -p "Press [Enter] key to re-start IP setup..."
-	askIPAddress
-   fi
 
 
-#kasten_ip=$(microk8s kubectl get svc gateway-ext --namespace kasten-io -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 	echo ""
 	#echo "DONE! You should be able to access K10 at http://${kasten_ip}/k10/#"
 	sleep 5

@@ -11,12 +11,12 @@ IP_RANGE=$1
 
 deployMicroK8S() {
 #printf "${GREEN}Deploying MicroK8s\n"
-snap install microk8s --classic
+snap install microk8s --classic --channel=1.21
 sleep 1m
-microk8s enable dns registry istio helm3
+microk8s enable dns registry istio helm3 host-access
 sleep 2m
-microk8s enable metallb:${IP_RANGE}
-sleep 30
+#microk8s enable metallb:${IP_RANGE}
+#sleep 30
 }
 
 deployMicroK8S

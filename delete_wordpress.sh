@@ -7,4 +7,4 @@
 #Version: .1 Alpha
 ################################
 
-microk8s helm3 delete wordpress --namespace wordpress
+microk8s kubectl delete ns wordpress

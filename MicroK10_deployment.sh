@@ -50,11 +50,11 @@ setIPAddress() {
    printf "${NC}\n"
    read IP_1
    printf "\n"
-   printf "${LIGHT_BLUE}Enter a range of three or more consecutive IP addresses in the following format xxx.xxx.xxx.xxx-xxx.xxx.xxx.xxx\n"
-   printf "${LIGHT_BLUE}These will be used for applications deployed on the K8s Cluster\n"
-   printf "${NC}\n"
-   read IP_2
-   printf "\n"
+#   printf "${LIGHT_BLUE}Enter a range of three or more consecutive IP addresses in the following format xxx.xxx.xxx.xxx-xxx.xxx.xxx.xxx\n"
+#   printf "${LIGHT_BLUE}These will be used for applications deployed on the K8s Cluster\n"
+#   printf "${NC}\n"
+#   read IP_2
+#   printf "\n"
    printf "${LIGHT_BLUE}Enter subnet mask in slash notation, example /24 or /23:\n"
    printf "${NC}\n"
    read SUBNET
@@ -74,7 +74,7 @@ setIPAddress() {
    cat <<EOF> /etc/netplan/50-cloud-init.yaml
    network:
        ethernets:
-           ens192:
+           ens160:
                dhcp4: no
                addresses:
                  - ${IP_1}${SUBNET}
@@ -104,8 +104,8 @@ snap install microk8s --classic
 sleep 1m
 microk8s enable dns registry istio helm3
 sleep 2m
-microk8s enable metallb:${IP_2}
-sleep 30
+#microk8s enable metallb:${IP_2}
+#sleep 30
 }
 
 
@@ -126,15 +126,15 @@ deployK10 () {
 	microk8s helm3 repo add kasten https://charts.kasten.io/
 	microk8s kubectl create namespace kasten-io
 	microk8s helm3 install k10 kasten/k10 --namespace=kasten-io \
-	--set externalGateway.create=true \
 	--set injectKanisterSidecar.enabled=true \
 	--set auth.basicAuth.enabled=true \
 	--set auth.basicAuth.htpasswd='admin:{SHA}w897J5HmKpAlulJ694w+DvVjSp8='
 	echo "Waiting for K10 to finished starting"
 	sleep 4m
-	kasten_ip=$(microk8s kubectl get svc gateway-ext --namespace kasten-io -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+	#kasten_ip=$(microk8s kubectl get svc gateway-ext --namespace kasten-io -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 	echo ""
-	echo "DONE! You should be able to access K10 at http://${kasten_ip}/k10/#"
+	microk8s kubectl --namespace kasten-io port-forward service/gateway 8080:8000 --address ${IP_1}  > /dev/null 2>&1 &
+	echo "DONE! You should be able to access K10 at http://${IP_1}:8080/k10/#"
 	exit 1
 }
 

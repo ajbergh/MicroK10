@@ -35,11 +35,11 @@ setIPAddress() {
    printf "${NC}\n"
    read IP_1
    printf "\n"
-   printf "${GREEN}Enter a range of three or more consecutive IP addresses in the following format xxx.xxx.xxx.xxx-xxx.xxx.xxx.xxx\n"
-   printf "${GREEN}These will be used for applications deployed on the K8s Cluster\n"
-   printf "${NC}\n"
-   read IP_2
-   printf "\n"
+ #  printf "${GREEN}Enter a range of three or more consecutive IP addresses in the following format xxx.xxx.xxx.xxx-xxx.xxx.xxx.xxx\n"
+ #  printf "${GREEN}These will be used for applications deployed on the K8s Cluster\n"
+ #  printf "${NC}\n"
+ #  read IP_2
+ #  printf "\n"
    printf "${GREEN}Enter subnet mask in slash notation, example /24 or /23:\n"
    printf "${NC}\n"
    read SUBNET
@@ -50,7 +50,7 @@ setIPAddress() {
    printf "\n"
    printf "${GREEN}You've Entered:\n"
    printf "${GREEN}IP Address 1: $IP_1\n"
-   printf "${GREEN}IP Address Range is: $IP_2\n"
+  # printf "${GREEN}IP Address Range is: $IP_2\n"
    printf "${GREEN}Subnet Mask: $SUBNET\n"
    printf "${GREEN}Gateway: $GATEWAY\n"
    printf "${GREEN}Is This Correct?\n"
@@ -59,7 +59,7 @@ setIPAddress() {
    cat <<EOF> /etc/netplan/50-cloud-init.yaml
    network:
        ethernets:
-           ens192:
+           ens160:
                dhcp4: no
                addresses:
                  - ${IP_1}${SUBNET}
@@ -70,23 +70,23 @@ EOF
 
    netplan apply
    
-   cat <<EOF> metallb-config.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  namespace: metallb-system
-  name: config
-data:
-  config: |
-    address-pools:
-    - name: default
-      protocol: layer2
-      addresses:
-      - ${IP_2}
-EOF
+#   cat <<EOF> metallb-config.yaml
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  namespace: metallb-system
+#  name: config
+#data:
+#  config: |
+#    address-pools:
+#    - name: default
+#      protocol: layer2
+#      addresses:
+#      - ${IP_2}
+#EOF
    
-   microk8s kubectl apply -f metallb-config.yaml
-   microk8s kubectl delete po -n metallb-system --all
+#   microk8s kubectl apply -f metallb-config.yaml
+#   microk8s kubectl delete po -n metallb-system --all
    #current_ip=$(ip addr show ens192 | grep "inet\b" | awk '{print $2}')
    #printf "${NC}Your current ip address is $current_ip\n"
 
