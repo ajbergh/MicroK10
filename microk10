@@ -4,6 +4,7 @@
 
 set -Eeuo pipefail
 IFS=$'\n\t'
+export PATH="/snap/bin:/var/lib/snapd/snap/bin:${PATH}"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
@@ -60,6 +61,8 @@ source "${SCRIPT_DIR}/lib/platform.sh"
 source "${SCRIPT_DIR}/lib/kasten.sh"
 # shellcheck disable=SC1090
 source "${SCRIPT_DIR}/lib/cli.sh"
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/rocky-appliance.sh"
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   main "$@"
