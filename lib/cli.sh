@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # User-facing command routing and help.
+# shellcheck disable=SC2034 # Parsed options are consumed by sibling sourced modules.
 
 print_compatibility() {
   cat <<EOF_COMPAT
