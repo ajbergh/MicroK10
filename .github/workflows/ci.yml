@@ -22,5 +22,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes shellcheck shfmt
 
-      - name: Validate
-        run: make validate
+      - name: Bash syntax
+        run: bash -n microk10 lib/*.sh tests/*.sh *.sh
+
+      - name: ShellCheck
+        run: shellcheck microk10 lib/*.sh tests/*.sh *.sh
+
+      - name: Formatting
+        run: shfmt -d -i 2 microk10 lib/*.sh tests/*.sh *.sh
+
+      - name: Unit tests
+        run: bash tests/unit.sh
+
+      - name: Lifecycle dry run
+        run: bash tests/dry-run.sh
+
+      - name: Plaintext credential scan
+        run: bash tests/no-plaintext-secrets.sh
