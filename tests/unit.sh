@@ -50,7 +50,7 @@ assert_false "Ubuntu 20.04 is no longer tested" is_tested_ubuntu 20.04
 assert_true "amd64 is supported" is_supported_architecture amd64
 assert_true "arm64 is supported" is_supported_architecture arm64
 
-if (( failures > 0 )); then
+if ((failures > 0)); then
   printf '%d test(s) failed\n' "${failures}" >&2
   exit 1
 fi
