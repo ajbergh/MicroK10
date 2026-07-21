@@ -3,10 +3,10 @@
 
 host_architecture() {
   case "$(uname -m)" in
-    x86_64) printf 'amd64\n' ;;
-    aarch64|arm64) printf 'arm64\n' ;;
-    ppc64le) printf 'ppc64le\n' ;;
-    *) uname -m ;;
+  x86_64) printf 'amd64\n' ;;
+  aarch64 | arm64) printf 'arm64\n' ;;
+  ppc64le) printf 'ppc64le\n' ;;
+  *) uname -m ;;
   esac
 }
 
@@ -50,10 +50,10 @@ host_preflight() {
   local mem disk
   mem="$(memory_mib)"
   disk="$(disk_available_gib)"
-  if (( mem < MIN_MEMORY_MIB )); then
+  if ((mem < MIN_MEMORY_MIB)); then
     log WARN "Only ${mem} MiB RAM detected; at least ${MIN_MEMORY_MIB} MiB is recommended for this lab stack."
   fi
-  if (( disk < MIN_DISK_GIB )); then
+  if ((disk < MIN_DISK_GIB)); then
     log WARN "Only ${disk} GiB is available under /var; at least ${MIN_DISK_GIB} GiB is recommended for installation."
   fi
 }
