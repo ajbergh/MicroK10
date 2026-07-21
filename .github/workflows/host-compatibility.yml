@@ -1,4 +1,4 @@
-name: Host compatibility matrix
+name: Rocky host compatibility matrix
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: microk10-host-${{ github.workflow }}-${{ github.ref }}
+  group: microk10-rocky-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -20,21 +20,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          - ubuntu-22.04
-          - ubuntu-24.04
-          - ubuntu-26.04
-          - ubuntu-22.04-arm
-          - ubuntu-24.04-arm
-          - ubuntu-26.04-arm
+        include:
+          - runner: ubuntu-24.04
+            rocky: "9.8"
+          - runner: ubuntu-24.04
+            rocky: "10.2"
+          - runner: ubuntu-24.04-arm
+            rocky: "9.8"
+          - runner: ubuntu-24.04-arm
+            rocky: "10.2"
     runs-on: ${{ matrix.runner }}
+    container:
+      image: rockylinux/rockylinux:${{ matrix.rocky }}
     steps:
+      - name: Install test prerequisites
+        shell: bash
+        run: dnf install -y git grep sed gawk findutils
+
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Validate scripts and compatibility logic
+      - name: Validate Rocky compatibility logic
+        shell: bash
         run: |
-          bash -n microk10 lib/*.sh tests/*.sh *.sh
+          source /etc/os-release
+          test "${VERSION_ID}" = "${{ matrix.rocky }}"
+          bash -n microk10 lib/*.sh tests/*.sh *.sh appliance/microk10-tui appliance/lib/*.sh appliance/packer/scripts/*.sh
           bash tests/unit.sh
           bash tests/no-plaintext-secrets.sh
           ./microk10 compatibility
+          ./microk10 compatibility | grep -q "${{ matrix.rocky }}"
