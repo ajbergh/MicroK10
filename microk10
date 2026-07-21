@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# MicroK10: opinionated MicroK8s + Veeam Kasten lifecycle automation.
+
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+COMPATIBILITY_FILE="${SCRIPT_DIR}/config/compatibility.env"
+readonly COMPATIBILITY_FILE
+
+if [[ ! -r "${COMPATIBILITY_FILE}" ]]; then
+  printf 'ERROR: compatibility file not found: %s\n' "${COMPATIBILITY_FILE}" >&2
+  exit 1
+fi
+# shellcheck disable=SC1090
+source "${COMPATIBILITY_FILE}"
+
+readonly KASTEN_CHART_REPOSITORY="https://charts.kasten.io/"
+readonly KASTEN_KEY_URL="https://repository.veeam.com/keys/RPM-KASTEN"
+readonly KASTEN_DOCS_BASE="https://docs.kasten.io/downloads"
+readonly DEFAULT_NAMESPACE="kasten-io"
+readonly DEFAULT_RELEASE="k10"
+readonly DEFAULT_STORAGE_CLASS="microk8s-hostpath"
+readonly DEFAULT_TIMEOUT="20m"
+readonly DEFAULT_PORT="8080"
+readonly DEFAULT_ADDRESS="127.0.0.1"
+readonly MIN_MEMORY_MIB=6144
+readonly MIN_DISK_GIB=20
+
+COLOR=true
+DRY_RUN=false
+VERBOSE=false
+YES=false
+ALLOW_UNSUPPORTED=false
+SKIP_PRIMER=false
+SKIP_CHART_VERIFICATION=false
+PURGE_MICROK8S=false
+MICROK8S_CHANNEL="${MICROK10_MICROK8S_CHANNEL:-${MICROK10_DEFAULT_MICROK8S_CHANNEL}}"
+KASTEN_VERSION="${MICROK10_KASTEN_VERSION:-${MICROK10_DEFAULT_KASTEN_VERSION}}"
+KASTEN_NAMESPACE="${MICROK10_NAMESPACE:-${DEFAULT_NAMESPACE}}"
+KASTEN_RELEASE="${MICROK10_RELEASE:-${DEFAULT_RELEASE}}"
+STORAGE_CLASS="${MICROK10_STORAGE_CLASS:-${DEFAULT_STORAGE_CLASS}}"
+WAIT_TIMEOUT="${MICROK10_TIMEOUT:-${DEFAULT_TIMEOUT}}"
+VALUES_FILE=""
+METALLB_RANGE=""
+DASHBOARD_ADDRESS="${DEFAULT_ADDRESS}"
+DASHBOARD_PORT="${DEFAULT_PORT}"
+
+if [[ ! -t 1 || -n "${NO_COLOR:-}" ]]; then
+  COLOR=false
+fi
+
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/core.sh"
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/platform.sh"
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/kasten.sh"
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/cli.sh"
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

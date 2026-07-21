@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible MicroK10 installation or lifecycle problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials, kubeconfigs, tokens, or customer data.
+  - type: input
+    id: ubuntu
+    attributes:
+      label: Ubuntu release
+      placeholder: 24.04
+    validations:
+      required: true
+  - type: input
+    id: architecture
+    attributes:
+      label: Architecture
+      placeholder: amd64 or arm64
+    validations:
+      required: true
+  - type: input
+    id: microk8s
+    attributes:
+      label: MicroK8s channel and Kubernetes version
+      placeholder: 1.34/stable, v1.34.x
+    validations:
+      required: true
+  - type: input
+    id: kasten
+    attributes:
+      label: Veeam Kasten version
+      placeholder: 9.0.1
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Redacted output
+      description: Include the failing command and redacted error output.
+    validations:
+      required: true

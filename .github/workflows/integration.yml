@@ -1,0 +1,62 @@
+name: MicroK8s and Kasten integration matrix
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: microk10-integration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+        kubernetes:
+          - "1.31"
+          - "1.32"
+          - "1.33"
+          - "1.34"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Reclaim runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc || true
+          sudo docker system prune --all --force || true
+
+      - name: Install the selected MicroK8s release
+        run: |
+          sudo ./microk10 install-microk8s \
+            --microk8s-channel ${{ matrix.kubernetes }}/stable \
+            --timeout 20m
+
+      - name: Install and validate Veeam Kasten
+        run: |
+          sudo ./microk10 install-kasten \
+            --microk8s-channel ${{ matrix.kubernetes }}/stable \
+            --kasten-version 9.0.1 \
+            --skip-primer \
+            --timeout 30m
+          sudo ./microk10 validate \
+            --microk8s-channel ${{ matrix.kubernetes }}/stable \
+            --kasten-version 9.0.1 \
+            --timeout 20m
+
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          sudo ./microk10 status --allow-unsupported || true
+          sudo microk8s inspect || true
+          sudo microk8s kubectl get nodes,storageclass,pods --all-namespaces -o wide || true

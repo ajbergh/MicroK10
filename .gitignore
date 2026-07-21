@@ -1,0 +1,6 @@
+*.log
+*.tmp
+*.swp
+.env
+k10_debug_logs.tar.gz
+artifacts/

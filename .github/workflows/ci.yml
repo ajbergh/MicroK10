@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes --quiet shellcheck shfmt
+
+      - name: Bash syntax
+        run: bash -n microk10 lib/*.sh tests/*.sh *.sh
+
+      - name: ShellCheck
+        id: shellcheck
+        continue-on-error: true
+        run: shellcheck --format=gcc microk10 lib/*.sh tests/*.sh *.sh > shellcheck.txt 2>&1
+
+      - name: Upload ShellCheck diagnostics
+        if: steps.shellcheck.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shellcheck-diagnostics
+          path: shellcheck.txt
+          retention-days: 3
+
+      - name: Enforce ShellCheck result
+        if: steps.shellcheck.outcome == 'failure'
+        run: |
+          cat shellcheck.txt
+          exit 1
+
+      - name: Formatting
+        id: formatting
+        continue-on-error: true
+        run: shfmt -d -i 2 microk10 lib/*.sh tests/*.sh *.sh > shfmt.diff
+
+      - name: Generate formatted diagnostics
+        if: steps.formatting.outcome == 'failure'
+        run: shfmt -w -i 2 microk10 lib/*.sh tests/*.sh *.sh
+
+      - name: Upload formatting diagnostics
+        if: steps.formatting.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shfmt-diagnostics
+          path: |
+            shfmt.diff
+            microk10
+            lib
+            tests
+            *.sh
+          retention-days: 3
+
+      - name: Enforce formatting result
+        if: steps.formatting.outcome == 'failure'
+        run: |
+          cat shfmt.diff
+          exit 1
+
+      - name: Unit tests
+        run: bash tests/unit.sh
+
+      - name: Lifecycle dry run
+        run: bash tests/dry-run.sh
+
+      - name: Plaintext credential scan
+        run: bash tests/no-plaintext-secrets.sh
