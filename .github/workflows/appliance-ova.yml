@@ -1,0 +1,78 @@
+name: Build Rocky MicroK10 OVA
+
+on:
+  workflow_dispatch:
+    inputs:
+      rocky_version:
+        description: Rocky Linux appliance release
+        required: true
+        default: "9.8"
+        type: choice
+        options:
+          - "9.8"
+          - "10.2"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Requires a self-hosted Windows runner with VMware Workstation Pro,
+    # VMware OVF Tool, Packer, and ssh-keygen installed.
+    runs-on: [self-hosted, Windows, X64, vmware]
+    timeout-minutes: 120
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create ephemeral Packer SSH key
+        shell: pwsh
+        run: |
+          $key = Join-Path $env:RUNNER_TEMP "microk10-packer"
+          ssh-keygen -q -t ed25519 -N "" -f $key
+          "MICROK10_BUILD_KEY=$key" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $pub = (Get-Content "$key.pub" -Raw).Trim()
+          "MICROK10_BUILD_PUB=$pub" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Initialize Packer plugins
+        shell: pwsh
+        run: packer init appliance/packer/rocky-microk10.pkr.hcl
+
+      - name: Validate Packer template
+        shell: pwsh
+        run: |
+          $vars = "appliance/packer/rocky-${{ inputs.rocky_version }}.pkrvars.hcl"
+          packer validate `
+            -var-file=$vars `
+            -var "ssh_public_key=$env:MICROK10_BUILD_PUB" `
+            -var "ssh_private_key_file=$env:MICROK10_BUILD_KEY" `
+            appliance/packer/rocky-microk10.pkr.hcl
+
+      - name: Build OVA
+        shell: pwsh
+        run: |
+          $vars = "appliance/packer/rocky-${{ inputs.rocky_version }}.pkrvars.hcl"
+          packer build `
+            -var-file=$vars `
+            -var "ssh_public_key=$env:MICROK10_BUILD_PUB" `
+            -var "ssh_private_key_file=$env:MICROK10_BUILD_KEY" `
+            appliance/packer/rocky-microk10.pkr.hcl
+
+      - name: Upload OVA artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: MicroK10-Rocky-${{ inputs.rocky_version }}-OVA
+          path: |
+            output-*/**/*.ova
+            output-*/*.ova
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Remove ephemeral build key
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:MICROK10_BUILD_KEY) {
+            Remove-Item -Force -ErrorAction SilentlyContinue $env:MICROK10_BUILD_KEY
+            Remove-Item -Force -ErrorAction SilentlyContinue "$env:MICROK10_BUILD_KEY.pub"
+          }
