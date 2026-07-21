@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT=/opt/microk10
+# shellcheck source=appliance/lib/network.sh
+source "${ROOT}/appliance/lib/network.sh"
+# shellcheck source=appliance/lib/minio.sh
+source "${ROOT}/appliance/lib/minio.sh"
+# shellcheck source=appliance/lib/state.sh
+source "${ROOT}/appliance/lib/state.sh"
+# shellcheck source=appliance/lib/labs.sh
+source "${ROOT}/appliance/lib/labs.sh"
+
+need_dialog() { command -v dialog >/dev/null || dnf install -y dialog; }
+msg() { dialog --title "MicroK10" --msgbox "$1" 14 78; }
+
+configure_network_menu() {
+  local choice iface address gateway dns
+  choice="$(dialog --stdout --title 'Network' --menu 'Configure appliance networking' 15 72 5 DHCP 'Use automatic addressing' STATIC 'Configure static IPv4' STATUS 'Show current network' TEST 'Test connectivity')" || return
+  case "${choice}" in
+  DHCP)
+    configure_dhcp
+    msg 'DHCP configuration applied.'
+    ;;
+  STATIC)
+    iface="$(primary_interface)"
+    address="$(dialog --stdout --inputbox 'IPv4 address with CIDR (example 192.168.1.50/24)' 9 72)" || return
+    gateway="$(dialog --stdout --inputbox 'Default gateway' 9 72)" || return
+    dns="$(dialog --stdout --inputbox 'DNS servers (comma separated)' 9 72 '1.1.1.1,8.8.8.8')" || return
+    configure_static "${iface}" "${address}" "${gateway}" "${dns}"
+    msg 'Static network configuration applied.'
+    ;;
+  STATUS) msg "$(network_summary)" ;;
+  TEST) test_network && msg 'Network, DNS, and HTTPS tests passed.' || msg 'Network validation failed. Check routing, DNS, and Internet access.' ;;
+  esac
+}
+
+labs_menu() {
+  local choice
+  while true; do
+    choice="$(dialog --stdout --title 'MicroK10 Guided Kasten Labs' --menu 'Backup and recovery lab actions' 20 86 8 \
+      PREPARE 'Create demo workload, MinIO profile, and Kasten policy' \
+      DATA 'Show current persistent demo data' \
+      BACKUP 'Run backup + export policy now and wait for completion' \
+      POINTS 'List Kasten restore points for the demo namespace' \
+      DELETE 'Delete the demo namespace to simulate application loss' \
+      DASHBOARD 'Open Kasten dashboard for restore workflow' \
+      BACK 'Return to appliance menu')" || return
+    case "${choice}" in
+    PREPARE) create_lab_policy 2>&1 | dialog --programbox 'Preparing Lab' 28 100 ;;
+    DATA) show_demo_data 2>&1 | dialog --programbox 'Demo Persistent Data' 22 100 ;;
+    BACKUP) run_lab_backup 2>&1 | dialog --programbox 'Kasten Backup + Export' 30 100 ;;
+    POINTS) list_demo_restore_points 2>&1 | dialog --programbox 'Restore Points' 28 110 ;;
+    DELETE)
+      if dialog --yesno 'Delete microk10-demo to simulate application loss? A successful backup should exist first.' 10 78; then
+        delete_demo_for_restore_lab 2>&1 | dialog --programbox 'Deleting Demo Application' 22 100
+      fi
+      ;;
+    DASHBOARD) clear; exec "${ROOT}/microk10" dashboard ;;
+    BACK) return ;;
+    esac
+  done
+}
+
+first_boot() {
+  dialog --title 'Welcome to MicroK10' --msgbox 'MicroK10 is a self-contained Rocky Linux single-node Kubernetes and Veeam Kasten lab appliance. This wizard configures networking and can deploy MicroK8s, Kasten, local MinIO, and the demo workload.' 14 82
+  configure_network_menu
+  if ! test_network; then
+    msg 'Internet connectivity is not ready. You can continue setup later from the main menu.'
+    return
+  fi
+  if dialog --title 'Install Kubernetes and Kasten' --yesno 'Install the validated MicroK8s and Veeam Kasten releases now?' 10 72; then
+    "${ROOT}/microk10" install 2>&1 | dialog --programbox 'Installing MicroK8s and Kasten' 30 100
+  fi
+  if dialog --title 'Local MinIO' --yesno 'Install local MinIO object storage and create the Kasten backup location?' 10 72; then
+    install_minio
+    if command -v microk8s >/dev/null && microk8s kubectl get namespace kasten-io >/dev/null 2>&1; then
+      configure_kasten_minio
+    fi
+  fi
+  if dialog --title 'Demo workload' --yesno 'Install the PVC-backed demo workload for backup and restore testing?' 10 72; then
+    "${ROOT}/microk10" demo install
+  fi
+  mark_initialized
+  msg 'Initial appliance setup is complete. All components remain manageable from this console.'
+}
+
+factory_reset_menu() {
+  local answer
+  answer="$(dialog --stdout --inputbox 'Factory reset removes Kubernetes, Kasten, MinIO data, generated credentials, and appliance state. Type RESET to continue.' 12 82)" || return
+  if [[ "${answer}" == RESET ]]; then
+    factory_reset
+    msg 'Factory reset completed. The appliance will reboot into first-boot setup.'
+    reboot
+  fi
+}
+
+main_menu() {
+  local choice
+  while true; do
+    choice="$(dialog --stdout --clear --title 'MicroK10 - Rocky Linux Kubernetes + Kasten Lab Appliance' --menu 'Choose an appliance function' 27 88 16 \
+      NETWORK 'Configure and test networking' \
+      INSTALL 'Install MicroK8s and Veeam Kasten' \
+      STATUS 'Show Kubernetes and Kasten status' \
+      DASHBOARD 'Start local Kasten dashboard port-forward' \
+      MINIO 'Install/start local MinIO object storage' \
+      MINIOPROFILE 'Create/update the Kasten MinIO Location Profile' \
+      MINIOSTATUS 'Show MinIO status' \
+      MINIOCREDS 'Display generated MinIO credentials' \
+      DEMO 'Install PVC-backed demo workload' \
+      LABS 'Guided Kasten backup and recovery labs' \
+      VALIDATE 'Run MicroK10 validation' \
+      RESET 'Factory reset appliance' \
+      SHELL 'Open maintenance shell' \
+      REBOOT 'Reboot appliance' \
+      POWEROFF 'Power off appliance')" || break
+    case "${choice}" in
+    NETWORK) configure_network_menu ;;
+    INSTALL) "${ROOT}/microk10" install 2>&1 | dialog --programbox 'Installing MicroK8s and Kasten' 30 100 ;;
+    STATUS) "${ROOT}/microk10" status 2>&1 | dialog --programbox 'MicroK10 Status' 30 100 ;;
+    DASHBOARD) clear; exec "${ROOT}/microk10" dashboard ;;
+    MINIO) install_minio; msg 'MinIO is running on ports 9000/9001.' ;;
+    MINIOPROFILE) configure_kasten_minio; msg 'Kasten MinIO Location Profile applied.' ;;
+    MINIOSTATUS) minio_status 2>&1 | dialog --programbox 'MinIO Status' 30 100 ;;
+    MINIOCREDS) msg "$(minio_credentials)" ;;
+    DEMO) "${ROOT}/microk10" demo install && msg 'Demo workload installed.' ;;
+    LABS) labs_menu ;;
+    VALIDATE) "${ROOT}/microk10" validate 2>&1 | dialog --programbox 'Validation' 30 100 ;;
+    RESET) factory_reset_menu ;;
+    SHELL) clear; bash ;;
+    REBOOT) reboot ;;
+    POWEROFF) poweroff ;;
+    esac
+  done
+  clear
+}
+
+need_dialog
+if ! appliance_initialized; then
+  first_boot
+fi
+main_menu

@@ -4,8 +4,12 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
+# CI may execute this source-level dry run on a non-Rocky runner. The
+# compatibility override bypasses only the host-OS gate; Kubernetes channel
+# compatibility remains tested separately below.
 output="$(./microk10 install \
   --dry-run \
+  --allow-unsupported \
   --skip-primer \
   --skip-chart-verification \
   --no-color 2>&1)"

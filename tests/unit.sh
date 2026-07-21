@@ -44,9 +44,9 @@ assert_eq "1.34" "$(channel_minor 1.34/candidate)" "parse candidate MicroK8s cha
 assert_true "1.31 is supported" is_supported_kubernetes 1.31
 assert_true "1.34 is supported" is_supported_kubernetes 1.34
 assert_false "1.35 is blocked" is_supported_kubernetes 1.35
-assert_true "Ubuntu 22.04 is tested" is_tested_ubuntu 22.04
-assert_true "Ubuntu 26.04 is tested" is_tested_ubuntu 26.04
-assert_false "Ubuntu 20.04 is no longer tested" is_tested_ubuntu 20.04
+assert_true "Rocky Linux 9.8 is tested" is_tested_rocky 9.8
+assert_true "Rocky Linux 10.2 is tested" is_tested_rocky 10.2
+assert_false "Rocky Linux 8.10 is not an appliance target" is_tested_rocky 8.10
 assert_true "amd64 is supported" is_supported_architecture amd64
 assert_true "arm64 is supported" is_supported_architecture arm64
 

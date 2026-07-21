@@ -1,3 +1,6 @@
 shell=bash
 external-sources=true
 source-path=SCRIPTDIR
+# TUI menu dispatch intentionally calls optional-argument helpers without
+# forwarding script arguments, and uses compact success/failure menu actions.
+disable=SC2119,SC2015

@@ -23,12 +23,12 @@ jobs:
           sudo apt-get install --yes --quiet shellcheck shfmt
 
       - name: Bash syntax
-        run: bash -n microk10 lib/*.sh tests/*.sh *.sh
+        run: bash -n microk10 lib/*.sh tests/*.sh *.sh appliance/microk10-tui appliance/lib/*.sh appliance/packer/scripts/*.sh
 
       - name: ShellCheck
         id: shellcheck
         continue-on-error: true
-        run: shellcheck --format=gcc microk10 lib/*.sh tests/*.sh *.sh > shellcheck.txt 2>&1
+        run: shellcheck --format=gcc microk10 lib/*.sh tests/*.sh *.sh appliance/microk10-tui appliance/lib/*.sh appliance/packer/scripts/*.sh > shellcheck.txt 2>&1
 
       - name: Upload ShellCheck diagnostics
         if: steps.shellcheck.outcome == 'failure'
@@ -44,14 +44,17 @@ jobs:
           cat shellcheck.txt
           exit 1
 
+      # The console TUI contains compact dialog/case constructs that are
+      # syntax-checked and ShellChecked above; shfmt enforcement is applied to
+      # the lifecycle and appliance library code where formatting is stable.
       - name: Formatting
         id: formatting
         continue-on-error: true
-        run: shfmt -d -i 2 microk10 lib/*.sh tests/*.sh *.sh > shfmt.diff
+        run: shfmt -d -i 2 microk10 lib/*.sh tests/*.sh *.sh appliance/lib/*.sh appliance/packer/scripts/*.sh > shfmt.diff
 
       - name: Generate formatted diagnostics
         if: steps.formatting.outcome == 'failure'
-        run: shfmt -w -i 2 microk10 lib/*.sh tests/*.sh *.sh
+        run: shfmt -w -i 2 microk10 lib/*.sh tests/*.sh *.sh appliance/lib/*.sh appliance/packer/scripts/*.sh
 
       - name: Upload formatting diagnostics
         if: steps.formatting.outcome == 'failure'
@@ -63,6 +66,8 @@ jobs:
             microk10
             lib
             tests
+            appliance/lib
+            appliance/packer/scripts
             *.sh
           retention-days: 3
 

@@ -10,52 +10,37 @@ host_architecture() {
   esac
 }
 
-memory_mib() {
-  awk '/MemTotal:/ {print int($2 / 1024)}' /proc/meminfo
-}
-
-disk_available_gib() {
-  df -Pk /var 2>/dev/null | awk 'NR==2 {print int($4 / 1024 / 1024)}'
-}
+memory_mib() { awk '/MemTotal:/ {print int($2 / 1024)}' /proc/meminfo; }
+disk_available_gib() { df -Pk /var 2>/dev/null | awk 'NR==2 {print int($4 / 1024 / 1024)}'; }
 
 host_preflight() {
-  [[ "$(uname -s)" == Linux ]] || fatal "MicroK10 currently supports Linux hosts only."
-
+  [[ "$(uname -s)" == Linux ]] || fatal "MicroK10 appliance supports Linux hosts only."
   local arch
   arch="$(host_architecture)"
   if ! is_supported_architecture "${arch}"; then
-    if [[ "${ALLOW_UNSUPPORTED}" == true ]]; then
-      log WARN "Architecture ${arch} has not been validated by MicroK10."
-    else
-      fatal "Architecture ${arch} is not in the validated set: ${MICROK10_SUPPORTED_ARCHITECTURES}."
-    fi
+    [[ "${ALLOW_UNSUPPORTED}" == true ]] || fatal "Architecture ${arch} is not validated: ${MICROK10_SUPPORTED_ARCHITECTURES}."
+    log WARN "Architecture ${arch} is outside the validated appliance matrix."
   fi
 
   if [[ -r /etc/os-release ]]; then
     # shellcheck disable=SC1091
     source /etc/os-release
-    if [[ "${ID:-}" == ubuntu ]]; then
-      if ! is_tested_ubuntu "${VERSION_ID:-unknown}"; then
-        if [[ "${ALLOW_UNSUPPORTED}" == true ]]; then
-          log WARN "Ubuntu ${VERSION_ID:-unknown} has not been validated. Tested releases: ${MICROK10_TESTED_UBUNTU}."
-        else
-          fatal "Ubuntu ${VERSION_ID:-unknown} is outside the tested release set (${MICROK10_TESTED_UBUNTU})."
-        fi
+    if [[ "${ID:-}" == rocky ]]; then
+      if ! value_in_space_list "${VERSION_ID:-unknown}" "${MICROK10_TESTED_ROCKY}"; then
+        [[ "${ALLOW_UNSUPPORTED}" == true ]] || fatal "Rocky Linux ${VERSION_ID:-unknown} is outside the validated appliance set (${MICROK10_TESTED_ROCKY})."
+        log WARN "Rocky Linux ${VERSION_ID:-unknown} has not been validated."
       fi
     else
-      log WARN "${PRETTY_NAME:-This Linux distribution} is not in the tested Ubuntu matrix; snap-based MicroK8s may still work."
+      [[ "${ALLOW_UNSUPPORTED}" == true ]] || fatal "MicroK10 appliance builds target Rocky Linux (${MICROK10_TESTED_ROCKY}); detected ${PRETTY_NAME:-unknown}."
+      log WARN "Running outside the validated Rocky Linux appliance matrix."
     fi
   fi
 
   local mem disk
   mem="$(memory_mib)"
   disk="$(disk_available_gib)"
-  if ((mem < MIN_MEMORY_MIB)); then
-    log WARN "Only ${mem} MiB RAM detected; at least ${MIN_MEMORY_MIB} MiB is recommended for this lab stack."
-  fi
-  if ((disk < MIN_DISK_GIB)); then
-    log WARN "Only ${disk} GiB is available under /var; at least ${MIN_DISK_GIB} GiB is recommended for installation."
-  fi
+  ((mem >= MIN_MEMORY_MIB)) || log WARN "Only ${mem} MiB RAM detected; ${MIN_MEMORY_MIB} MiB is recommended."
+  ((disk >= MIN_DISK_GIB)) || log WARN "Only ${disk} GiB is available under /var; ${MIN_DISK_GIB} GiB is recommended."
 }
 
 ensure_snap() {
@@ -63,14 +48,21 @@ ensure_snap() {
     return 0
   fi
   require_root_or_sudo
-  command_exists apt-get || fatal "snap is missing and automatic installation is only supported on apt-based systems."
-  run_as_root apt-get update
-  run_as_root apt-get install -y snapd curl ca-certificates
+  if command_exists dnf; then
+    log INFO "Installing snapd from EPEL for Rocky Linux."
+    run_as_root dnf install -y epel-release
+    run_as_root dnf install -y snapd curl ca-certificates
+    run_as_root systemctl enable --now snapd.socket
+    if [[ ! -e /snap ]]; then
+      run_as_root ln -s /var/lib/snapd/snap /snap
+    fi
+    run_as_root systemctl restart snapd.socket
+    return 0
+  fi
+  fatal "snap is missing and this appliance expects Rocky Linux with dnf/EPEL."
 }
 
-microk8s_installed() {
-  command_exists microk8s || { command_exists snap && snap list microk8s >/dev/null 2>&1; }
-}
+microk8s_installed() { command_exists microk8s || { command_exists snap && snap list microk8s >/dev/null 2>&1; }; }
 
 wait_for_microk8s() {
   require_command timeout
@@ -90,9 +82,7 @@ enable_addon() {
 
 configure_microk8s_user() {
   local target_user="${SUDO_USER:-${USER:-root}}"
-  if [[ "${target_user}" == root || -z "${target_user}" ]]; then
-    return 0
-  fi
+  [[ "${target_user}" != root && -n "${target_user}" ]] || return 0
   if getent group microk8s >/dev/null 2>&1; then
     run_as_root usermod -a -G microk8s "${target_user}"
   fi
@@ -109,33 +99,27 @@ install_microk8s() {
   host_preflight
   require_root_or_sudo
   ensure_snap
-
   if ! microk8s_installed; then
     log INFO "Installing MicroK8s from ${MICROK8S_CHANNEL}."
     run_as_root snap install microk8s --classic --channel="${MICROK8S_CHANNEL}"
   else
     log INFO "MicroK8s is already installed; preserving the installed revision."
   fi
-
   wait_for_microk8s
   configure_microk8s_user
   enable_addon dns
   enable_addon hostpath-storage
-
   if ! run_as_root microk8s helm3 version --short >/dev/null 2>&1; then
     enable_addon helm3
   fi
-
   if [[ -n "${METALLB_RANGE}" ]]; then
     log INFO "Enabling MetalLB with address range ${METALLB_RANGE}."
     run_as_root microk8s enable "metallb:${METALLB_RANGE}"
   fi
-
   if [[ "${DRY_RUN}" == true ]]; then
     log OK "MicroK8s dry run completed; live server validation was skipped."
     return 0
   fi
-
   validate_kubernetes_version
   log OK "MicroK8s is ready."
 }
@@ -154,11 +138,8 @@ validate_kubernetes_version() {
   [[ -n "${git_version}" ]] || fatal "Unable to determine the Kubernetes server version."
   minor="$(version_minor "${git_version}")" || fatal "Unable to parse Kubernetes version '${git_version}'."
   if ! is_supported_kubernetes "${minor}"; then
-    if [[ "${ALLOW_UNSUPPORTED}" == true ]]; then
-      log WARN "Kubernetes ${git_version} is outside the validated Kasten ${KASTEN_VERSION} matrix."
-    else
-      fatal "Kubernetes ${git_version} is unsupported by the validated Kasten ${KASTEN_VERSION} matrix (${MICROK10_SUPPORTED_KUBERNETES})."
-    fi
+    [[ "${ALLOW_UNSUPPORTED}" == true ]] || fatal "Kubernetes ${git_version} is unsupported by Kasten ${KASTEN_VERSION} (${MICROK10_SUPPORTED_KUBERNETES})."
+    log WARN "Kubernetes ${git_version} is outside the validated Kasten matrix."
   fi
   log OK "Kubernetes ${git_version} is compatible with the configured matrix."
 }
