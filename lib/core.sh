@@ -13,11 +13,11 @@ log() {
   shift
   local code="0"
   case "${level}" in
-    INFO) code="1;34" ;;
-    WARN) code="1;33" ;;
-    ERROR) code="1;31" ;;
-    OK) code="1;32" ;;
-    DEBUG) code="0;36" ;;
+  INFO) code="1;34" ;;
+  WARN) code="1;33" ;;
+  ERROR) code="1;31" ;;
+  OK) code="1;32" ;;
+  DEBUG) code="0;36" ;;
   esac
   if [[ "${level}" == DEBUG && "${VERBOSE}" != true ]]; then
     return 0
@@ -61,7 +61,7 @@ run() {
 }
 
 run_as_root() {
-  if (( EUID == 0 )); then
+  if ((EUID == 0)); then
     run "$@"
   else
     run sudo "$@"
@@ -80,7 +80,7 @@ require_root_or_sudo() {
   if [[ "${DRY_RUN}" == true ]]; then
     return 0
   fi
-  if (( EUID != 0 )); then
+  if ((EUID != 0)); then
     command_exists sudo || fatal "Run as root or install sudo."
     sudo -n true 2>/dev/null || fatal "Root privileges are required. Re-run with sudo or configure sudo access."
   fi
@@ -149,5 +149,5 @@ validate_metallb_range() {
 
 validate_port() {
   [[ "${DASHBOARD_PORT}" =~ ^[0-9]+$ ]] || fatal "Dashboard port must be numeric."
-  (( DASHBOARD_PORT >= 1 && DASHBOARD_PORT <= 65535 )) || fatal "Dashboard port must be between 1 and 65535."
+  ((DASHBOARD_PORT >= 1 && DASHBOARD_PORT <= 65535)) || fatal "Dashboard port must be between 1 and 65535."
 }
