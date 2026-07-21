@@ -67,28 +67,102 @@ parse_options() {
   POSITIONAL=()
   while (($#)); do
     case "$1" in
-      --microk8s-channel) [[ $# -ge 2 ]] || fatal "$1 requires a value"; MICROK8S_CHANNEL="$2"; shift 2 ;;
-      --kasten-version) [[ $# -ge 2 ]] || fatal "$1 requires a value"; KASTEN_VERSION="$2"; shift 2 ;;
-      --namespace) [[ $# -ge 2 ]] || fatal "$1 requires a value"; KASTEN_NAMESPACE="$2"; shift 2 ;;
-      --release) [[ $# -ge 2 ]] || fatal "$1 requires a value"; KASTEN_RELEASE="$2"; shift 2 ;;
-      --storage-class) [[ $# -ge 2 ]] || fatal "$1 requires a value"; STORAGE_CLASS="$2"; shift 2 ;;
-      --values) [[ $# -ge 2 ]] || fatal "$1 requires a value"; VALUES_FILE="$2"; shift 2 ;;
-      --timeout) [[ $# -ge 2 ]] || fatal "$1 requires a value"; WAIT_TIMEOUT="$2"; shift 2 ;;
-      --metallb-range) [[ $# -ge 2 ]] || fatal "$1 requires a value"; METALLB_RANGE="$2"; shift 2 ;;
-      --address) [[ $# -ge 2 ]] || fatal "$1 requires a value"; DASHBOARD_ADDRESS="$2"; shift 2 ;;
-      --port) [[ $# -ge 2 ]] || fatal "$1 requires a value"; DASHBOARD_PORT="$2"; shift 2 ;;
-      --skip-primer) SKIP_PRIMER=true; shift ;;
-      --skip-chart-verification) SKIP_CHART_VERIFICATION=true; shift ;;
-      --allow-unsupported) ALLOW_UNSUPPORTED=true; shift ;;
-      --purge-microk8s) PURGE_MICROK8S=true; shift ;;
-      --yes|-y) YES=true; shift ;;
-      --dry-run) DRY_RUN=true; shift ;;
-      --verbose|-v) VERBOSE=true; shift ;;
-      --no-color) COLOR=false; shift ;;
-      -h|--help) POSITIONAL+=(help); shift ;;
-      --) shift; POSITIONAL+=("$@"); break ;;
-      -*) fatal "Unknown option: $1" ;;
-      *) POSITIONAL+=("$1"); shift ;;
+    --microk8s-channel)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      MICROK8S_CHANNEL="$2"
+      shift 2
+      ;;
+    --kasten-version)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      KASTEN_VERSION="$2"
+      shift 2
+      ;;
+    --namespace)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      KASTEN_NAMESPACE="$2"
+      shift 2
+      ;;
+    --release)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      KASTEN_RELEASE="$2"
+      shift 2
+      ;;
+    --storage-class)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      STORAGE_CLASS="$2"
+      shift 2
+      ;;
+    --values)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      VALUES_FILE="$2"
+      shift 2
+      ;;
+    --timeout)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      WAIT_TIMEOUT="$2"
+      shift 2
+      ;;
+    --metallb-range)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      METALLB_RANGE="$2"
+      shift 2
+      ;;
+    --address)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      DASHBOARD_ADDRESS="$2"
+      shift 2
+      ;;
+    --port)
+      [[ $# -ge 2 ]] || fatal "$1 requires a value"
+      DASHBOARD_PORT="$2"
+      shift 2
+      ;;
+    --skip-primer)
+      SKIP_PRIMER=true
+      shift
+      ;;
+    --skip-chart-verification)
+      SKIP_CHART_VERIFICATION=true
+      shift
+      ;;
+    --allow-unsupported)
+      ALLOW_UNSUPPORTED=true
+      shift
+      ;;
+    --purge-microk8s)
+      PURGE_MICROK8S=true
+      shift
+      ;;
+    --yes | -y)
+      YES=true
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    --verbose | -v)
+      VERBOSE=true
+      shift
+      ;;
+    --no-color)
+      COLOR=false
+      shift
+      ;;
+    -h | --help)
+      POSITIONAL+=(help)
+      shift
+      ;;
+    --)
+      shift
+      POSITIONAL+=("$@")
+      break
+      ;;
+    -*) fatal "Unknown option: $1" ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+      ;;
     esac
   done
   validate_timeout
@@ -100,25 +174,32 @@ main() {
   local command="${POSITIONAL[0]:-help}"
   local subcommand="${POSITIONAL[1]:-}"
   case "${command}" in
-    install) install_microk8s; install_kasten ;;
-    install-microk8s) install_microk8s ;;
-    install-kasten) install_kasten ;;
-    validate) validate_kubernetes_version; validate_kasten; log OK "MicroK10 validation passed." ;;
-    status) status ;;
-    dashboard) dashboard ;;
-    demo)
-      case "${subcommand}" in
-        install) install_demo ;;
-        remove|delete|uninstall) remove_demo ;;
-        *) fatal "Usage: ${0##*/} demo install|remove" ;;
-      esac
-      ;;
-    upgrade-microk8s) upgrade_microk8s ;;
-    upgrade-kasten) upgrade_kasten ;;
-    uninstall) uninstall_kasten ;;
-    compatibility) print_compatibility ;;
-    version) printf '%s\n' "${MICROK10_RELEASE_VERSION}" ;;
-    help) usage ;;
-    *) fatal "Unknown command '${command}'. Run '${0##*/} help'." ;;
+  install)
+    install_microk8s
+    install_kasten
+    ;;
+  install-microk8s) install_microk8s ;;
+  install-kasten) install_kasten ;;
+  validate)
+    validate_kubernetes_version
+    validate_kasten
+    log OK "MicroK10 validation passed."
+    ;;
+  status) status ;;
+  dashboard) dashboard ;;
+  demo)
+    case "${subcommand}" in
+    install) install_demo ;;
+    remove | delete | uninstall) remove_demo ;;
+    *) fatal "Usage: ${0##*/} demo install|remove" ;;
+    esac
+    ;;
+  upgrade-microk8s) upgrade_microk8s ;;
+  upgrade-kasten) upgrade_kasten ;;
+  uninstall) uninstall_kasten ;;
+  compatibility) print_compatibility ;;
+  version) printf '%s\n' "${MICROK10_RELEASE_VERSION}" ;;
+  help) usage ;;
+  *) fatal "Unknown command '${command}'. Run '${0##*/} help'." ;;
   esac
 }
