@@ -1,0 +1,40 @@
+name: Upstream release watch
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 6 * * 1"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Check the Kasten chart repository
+        id: versions
+        run: |
+          helm repo add kasten https://charts.kasten.io/ --force-update
+          helm repo update kasten
+          latest="$(helm search repo kasten/k10 --versions --output json | jq -r '.[0].version')"
+          configured="$(sed -n 's/^MICROK10_DEFAULT_KASTEN_VERSION="\(.*\)"/\1/p' config/compatibility.env)"
+          printf 'latest=%s\nconfigured=%s\n' "${latest}" "${configured}" | tee -a "${GITHUB_OUTPUT}" "${GITHUB_STEP_SUMMARY}"
+
+      - name: Open an update issue when Kasten advances
+        if: steps.versions.outputs.latest != steps.versions.outputs.configured
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST: ${{ steps.versions.outputs.latest }}
+          CONFIGURED: ${{ steps.versions.outputs.configured }}
+        run: |
+          title="Evaluate Veeam Kasten ${LATEST}"
+          if [[ -z "$(gh issue list --state open --search "${title} in:title" --json number --jq '.[0].number')" ]]; then
+            gh issue create \
+              --title "${title}" \
+              --body "The Kasten Helm repository now reports ${LATEST}; MicroK10 is pinned to ${CONFIGURED}. Review the official Kubernetes support matrix, update config/compatibility.env, run the full integration matrix, and update the compatibility documentation before changing the default."
+          fi
